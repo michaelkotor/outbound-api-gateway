@@ -45,8 +45,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          # Explicitly targets the v2 engine designed for Go 1.25+ compatibility
-          version: v2
+          version: v2.5.0
 
       - name: go build
         run: go build ./...
