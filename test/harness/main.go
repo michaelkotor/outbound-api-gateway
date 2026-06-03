@@ -144,7 +144,7 @@ func startOutputColorizer() {
 	go func() {
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
-			fmt.Fprintln(origStdout, colorizeLine(scanner.Text()))
+			_, _ = fmt.Fprintln(origStdout, colorizeLine(scanner.Text()))
 		}
 	}()
 }

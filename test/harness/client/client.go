@@ -184,7 +184,7 @@ func do(hc *http.Client, req *http.Request) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ func waitHealthy(name string, hc *http.Client, url string, timeout time.Duration
 		resp, err := hc.Do(req)
 		if err == nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
