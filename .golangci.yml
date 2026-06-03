@@ -1,0 +1,16 @@
+# Conservative linter set — keeps existing code passing while catching the
+# common, high-signal issues. Tighten over time.
+version: "2"
+
+linters:
+  enable:
+    - errcheck      # unchecked errors
+    - govet         # suspicious constructs
+    - ineffassign   # ineffectual assignments
+    - staticcheck   # static analysis suite
+    - unused        # unused code
+    - misspell      # common spelling mistakes in comments/strings
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

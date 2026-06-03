@@ -1,0 +1,30 @@
+server:
+  addr: ":9080"
+  read_timeout: 30s
+
+storage:
+  adapter: memory
+
+routes:
+  - name: api
+    prefix: /api
+    upstream: https://api.api.com
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: prod-primary
+        env: API_KEY_PROD_1
+        limits:
+          - window: 24h
+            max_requests: 10000
+          - window: 1h
+            max_requests: 1000
+      - name: prod-secondary
+        env: API_KEY_PROD_2
+        limits:
+          - window: 24h
+            max_requests: 10
+          - window: 1h
+            max_requests: 10

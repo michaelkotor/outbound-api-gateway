@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25"
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  # ---- Phase 1: quality gate + compile ------------------------------------
+  lint-build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: go build
+        run: go build ./...
+
+  # ---- Phase 2: unit tests ------------------------------------------------
+  unit-test:
+    name: Unit tests
+    needs: lint-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: go test (race + coverage)
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  # ---- Phase 3: integration tests (dockerized harness) --------------------
+  integration-test:
+    name: Integration tests
+    needs: unit-test
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILES: -f docker-compose.yml -f docker-compose.test.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Run integration harness
+        # Start from a clean slate: `compose run` leaves dependency containers
+        # (gateway, mockapi, redis) running, and the gateway holds non-resettable
+        # 60s key cooldowns, so a reused gateway would fail the healthy-key
+        # scenarios. down -v guarantees a fresh gateway for every run.
+        run: |
+          docker compose $COMPOSE_FILES down -v --remove-orphans
+          docker compose $COMPOSE_FILES run --rm --build harness
+
+      - name: Dump service logs on failure
+        if: always()
+        run: docker compose $COMPOSE_FILES logs --no-color || true
+
+      - name: Tear down
+        if: always()
+        run: docker compose $COMPOSE_FILES down -v --remove-orphans || true
+
+  # ---- Phase 4: build & publish image -------------------------------------
+  docker-image:
+    name: Build & publish image
+    needs: integration-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,152 @@
+server:
+  addr: ":8080"
+  read_timeout: 30s
+storage:
+  adapter: memory
+routes:
+  - name: api
+    prefix: /api
+    upstream: http://mockapi:9090
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: prod-primary
+        env: TEST_KEY_A
+        limits:
+          - window: 1m
+            max_requests: 100
+      - name: prod-secondary
+        env: TEST_KEY_B
+        limits:
+          - window: 1m
+            max_requests: 100
+      - name: dev-key
+        env: TEST_KEY_C
+        limits:
+          - window: 1m
+            max_requests: 100
+
+  # limit-api: used only by the LimitExhaustion scenario. limited-key has a
+  # very small gateway-side cap (5/min) so the scenario can exhaust it in a
+  # handful of requests; spare-key has no cap and handles overflow traffic.
+  # Both keys reuse the prod tokens so the mock can authenticate them.
+  - name: limit-api
+    prefix: /lapi
+    upstream: http://mockapi:9090
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: limited-key
+        env: TEST_KEY_A
+        limits:
+          - window: 1m
+            max_requests: 5
+      - name: spare-key
+        env: TEST_KEY_B
+
+  # recovery-api: used by CooldownRecovery and UpstreamTimeout. Short cooldown
+  # TTL (2s) makes recovery observable without a 60s wait; short upstream
+  # timeout (500ms) lets the timeout test use a 2s mock latency without
+  # hanging.
+  - name: recovery-api
+    prefix: /rapi
+    upstream: http://mockapi:9090
+    upstream_timeout: 500ms
+    cooldown_ttl: 2s
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: recovery-key
+        env: TEST_KEY_C
+
+  # race-api: used by layer-3 CounterDrift and DoubleCooldown.
+  # High limits (1000/1m per key) so 50×20 = 1000 requests all succeed.
+  # Short cooldown_ttl (2s) isolates DoubleCooldown from the 60s default.
+  - name: race-api
+    prefix: /race
+    upstream: http://mockapi:9090
+    cooldown_ttl: 2s
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: race-primary
+        env: TEST_KEY_A
+        limits:
+          - window: 1m
+            max_requests: 1000
+      - name: race-secondary
+        env: TEST_KEY_B
+        limits:
+          - window: 1m
+            max_requests: 1000
+      - name: race-tertiary
+        env: TEST_KEY_C
+        limits:
+          - window: 1m
+            max_requests: 1000
+
+  # race-budget-api: used by layer-3 NoOverrun.
+  # Gateway caps each key at 20/1m; three keys × 20 = 60 total budget.
+  # 30 goroutines × 3 requests = 90 attempts; the 30 overflow get 503.
+  # Mock limits are kept high so the gateway is the sole authority.
+  - name: race-budget-api
+    prefix: /rbudget
+    upstream: http://mockapi:9090
+    cooldown_ttl: 2s
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: budget-primary
+        env: TEST_KEY_A
+        limits:
+          - window: 1m
+            max_requests: 20
+      - name: budget-secondary
+        env: TEST_KEY_B
+        limits:
+          - window: 1m
+            max_requests: 20
+      - name: budget-tertiary
+        env: TEST_KEY_C
+        limits:
+          - window: 1m
+            max_requests: 20
+
+  # race-window-api: used by layer-3 WindowReset.
+  # 3s window with 5 req/window so phase-1 (15 sequential requests) fills
+  # all keys exactly, then a 3.5s sleep lets the window roll and the 15
+  # concurrent phase-3 requests all succeed in the fresh window.
+  - name: race-window-api
+    prefix: /rwindow
+    upstream: http://mockapi:9090
+    cooldown_ttl: 2s
+    selector: round_robin
+    headers:
+      inject:
+        Authorization: "Bearer {key}"
+    keys:
+      - name: window-key-a
+        env: TEST_KEY_A
+        limits:
+          - window: 3s
+            max_requests: 5
+      - name: window-key-b
+        env: TEST_KEY_B
+        limits:
+          - window: 3s
+            max_requests: 5
+      - name: window-key-c
+        env: TEST_KEY_C
+        limits:
+          - window: 3s
+            max_requests: 5

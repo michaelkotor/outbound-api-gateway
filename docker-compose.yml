@@ -1,0 +1,25 @@
+services:
+  gateway:
+    build: .
+    ports:
+      - "9080:9080"
+    volumes:
+      - ./config.example.yaml:/config.yaml:ro
+    environment:
+      # Override the listen address without editing the mounted config.
+      GATEWAY_ADDR: ":9080"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10

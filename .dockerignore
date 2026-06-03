@@ -1,0 +1,31 @@
+# Keep the Docker build context small and free of secrets. The gateway image
+# only needs Go sources + go.mod/go.sum; the harness/mockapi images additionally
+# need test/**, which is deliberately NOT ignored below.
+
+# VCS and editor/tooling metadata
+.git
+.github
+.gitignore
+.idea
+.vscode
+.claude
+*.iml
+
+# Secrets — never ship these into a build layer
+.env
+.env.*
+!.env.example
+
+# Prebuilt local binary (built fresh inside the image)
+/gateway
+
+# Go build/test artifacts
+*.out
+
+# Docs (CLAUDE.md, gateway-interfaces.md, test/*.md, etc.)
+*.md
+
+# Build/orchestration files not needed inside the image
+docker-compose*.yml
+Dockerfile
+**/Dockerfile

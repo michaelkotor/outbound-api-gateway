@@ -1,0 +1,25 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Built binaries
+/gateway
+*.exe
+
+# Go build/test artifacts
+*.out
+*.test
+
+# Local config override (config.yaml is the user's live config; only
+# config.example.yaml belongs in the repo)
+/config.yaml
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+.claude/
+
+# macOS
+.DS_Store

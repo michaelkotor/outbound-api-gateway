@@ -1,0 +1,65 @@
+# Integration / race test stack. Layered on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm harness
+#
+# Brings up the mock upstream API, points the gateway at it with the test
+# config, and runs the harness binary (layer 2 scenarios + layer 3 race cases).
+#
+# The mock and gateway run on scratch/distroless images with no shell, so they
+# expose no Docker healthcheck. The harness polls each service's /healthz
+# endpoint itself (10s gateway timeout, 5s mock timeout) before any scenario.
+services:
+  mockapi:
+    build:
+      context: .
+      dockerfile: test/mockapi/Dockerfile
+    environment:
+      MOCK_PORT: "9090"
+      MOCK_KEYS: "prod-primary:sk-aaa111,prod-secondary:sk-bbb222,dev-key:sk-ghi789"
+      MOCK_DEFAULT_LIMIT: "100"
+      MOCK_WINDOW: "1m"
+
+  gateway:
+    build:
+      context: .
+    # Override the base service: mount the integration config and inject the
+    # test key secrets. The gateway still does not connect to Redis in phase 1.
+    volumes:
+      - ./test/config.test.yaml:/config.yaml:ro
+    env_file: []
+    environment:
+      # The base compose sets GATEWAY_ADDR=:9080, which takes precedence over the
+      # config file. Pin it back to :8080 here so the gateway matches the test
+      # config and the harness target (gateway:8080).
+      GATEWAY_ADDR: ":8080"
+      TEST_KEY_A: "sk-aaa111"
+      TEST_KEY_B: "sk-bbb222"
+      TEST_KEY_C: "sk-ghi789"
+    depends_on:
+      mockapi:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  harness:
+    build:
+      context: .
+      dockerfile: test/harness/Dockerfile
+    environment:
+      GATEWAY_URL: "http://gateway:8080"
+      MOCK_URL: "http://mockapi:9090"
+    depends_on:
+      mockapi:
+        condition: service_started
+      gateway:
+        condition: service_started
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
