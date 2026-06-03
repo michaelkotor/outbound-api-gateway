@@ -80,6 +80,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create .env file
+        # Copies the example template to the active file required by the code
+        run: cp .env.example .env
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Run integration harness
