@@ -115,5 +115,5 @@ type fakeT struct {
 	failed bool
 }
 
-func (f *fakeT) Helper()                        {}
-func (f *fakeT) Fatalf(_ string, _ ...any)      { f.failed = true }
+func (f *fakeT) Helper()                   {}
+func (f *fakeT) Fatalf(_ string, _ ...any) { f.failed = true }

@@ -170,7 +170,7 @@ func NoOverrun(t *testing.T, gw *client.GatewayClient, mock *client.MockClient) 
 	const requestsPerGoroutine = 3
 	const total = goroutines * requestsPerGoroutine // 90
 	const budgetPerKey = 20
-	const budgetTotal = budgetPerKey * 3             // 60
+	const budgetTotal = budgetPerKey * 3 // 60
 
 	var mu sync.Mutex
 	var count200, count503, countOther int

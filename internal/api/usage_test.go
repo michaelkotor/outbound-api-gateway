@@ -43,15 +43,15 @@ func TestUsage_ReturnsAllKeys(t *testing.T) {
 	store := &stubStorage{
 		listResult: []storage.KeyUsage{
 			{
-				KeyName: "key-a",
-				Route:   "api",
-				Windows: []storage.WindowUsage{{Window: time.Hour, Count: 5, ResetsAt: now.Add(time.Hour)}},
+				KeyName:  "key-a",
+				Route:    "api",
+				Windows:  []storage.WindowUsage{{Window: time.Hour, Count: 5, ResetsAt: now.Add(time.Hour)}},
 				LastUsed: now,
 			},
 			{
-				KeyName: "key-b",
-				Route:   "api",
-				Windows: []storage.WindowUsage{{Window: time.Hour, Count: 3, ResetsAt: now.Add(time.Hour)}},
+				KeyName:  "key-b",
+				Route:    "api",
+				Windows:  []storage.WindowUsage{{Window: time.Hour, Count: 3, ResetsAt: now.Add(time.Hour)}},
 				LastUsed: now,
 			},
 		},
