@@ -14,6 +14,8 @@ concurrency:
 env:
   GO_VERSION: "1.25"
   IMAGE_NAME: ghcr.io/${{ github.repository }}
+  # Fixes the Node 20 deprecation warning across all actions globally
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # ---- Phase 1: quality gate + compile ------------------------------------
@@ -43,7 +45,8 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          # Explicitly targets the v2 engine designed for Go 1.25+ compatibility
+          version: v2
 
       - name: go build
         run: go build ./...
